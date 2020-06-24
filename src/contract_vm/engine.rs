@@ -49,7 +49,13 @@ impl ContractInstance
         };
         println!("Compiling code");
         let md = wasmer_runtime_core::compile_with(wasm.as_slice(),compiler().as_ref()).unwrap();
-        let inst = cosmwasm_vm::Instance::from_code(wasm.as_slice(),deps,DEFAULT_GAS_LIMIT).unwrap();
+        let inst = match cosmwasm_vm::Instance::from_code(wasm.as_slice(),deps,DEFAULT_GAS_LIMIT){
+            Err(e) => {
+                println!("cosmwasm_vm::Instance::from_code return error {}",e);
+                return Err("Instance from code execute failed!".to_string());
+            },
+            Ok(i) => i
+        };
         return Ok(ContractInstance::make_instance(md, inst, wasm_file.to_string()));
     }
 

@@ -6,6 +6,7 @@ pub mod contract_vm;
 use clap::{Arg, App};
 use std::io;
 use std::ops::Add;
+use crate::contract_vm::engine::ContractInstance;
 
 
 fn show_message_type(name : &str,members : &Vec<contract_vm::analyzer::Member>,engine : &contract_vm::engine::ContractInstance){
@@ -118,14 +119,8 @@ fn input_message(name : &str, members : &Vec<contract_vm::analyzer::Member>, eng
     return final_msg;
 }
 
-fn start_simulate(wasmfile:&str) -> Result<bool,String>{
-    println!("loading {}",wasmfile);
-    let mut engine = match contract_vm::build_simulation(wasmfile) {
-        Err(e) => return Err(e),
-        Ok(instance) => instance,
-    };
+fn simulate_by_auto_analyze(engine : &mut ContractInstance){
 
-    engine.analyzer.auto_load_json_schema(&engine.wasm_file);
     engine.analyzer.dump_all_members();
     loop {
         let mut is_enum = false;
@@ -133,6 +128,10 @@ fn start_simulate(wasmfile:&str) -> Result<bool,String>{
         let mut call_param = String::new();
         println!("Input call type(init | handle | query):");
         input_with_out_handle(&mut call_type);
+        if call_type.ne("init") && call_type.ne("handle") && call_type.ne("query") {
+            println!("Wrong call type[{}], must one of (init | handle | query)",call_type);
+            continue;
+        }
         print!("Input Call param from [ ");
         for k in engine.analyzer.map_of_member.keys(){
             print!("{} | ",k);
@@ -176,6 +175,40 @@ fn start_simulate(wasmfile:&str) -> Result<bool,String>{
         let result = engine.call(call_type,json_msg);
         println!("Call return msg [{}]",result);
     }
+}
+
+fn simulate_by_json(engine : &mut ContractInstance){
+    loop {
+        let mut call_type = String::new();
+        let mut json_msg = String::new();
+        println!("Input call type(init | handle | query):");
+        input_with_out_handle(&mut call_type);
+        if call_type.ne("init") && call_type.ne("handle") && call_type.ne("query") {
+            println!("Wrong call type[{}], must one of (init | handle | query)",call_type);
+            continue;
+        }
+        println!("Input json string:");
+        input_with_out_handle(&mut json_msg);
+        let result = engine.call(call_type,json_msg);
+        println!("Call return msg [{}]",result);
+    }
+}
+
+fn start_simulate(wasmfile:&str) -> Result<bool,String>{
+    println!("loading {}",wasmfile);
+    let mut engine = match contract_vm::build_simulation(wasmfile) {
+        Err(e) => return Err(e),
+        Ok(instance) => instance,
+    };
+
+    engine.show_module_info();
+    if engine.analyzer.auto_load_json_schema(&engine.wasm_file){
+        simulate_by_auto_analyze(&mut engine);
+    }else{
+        simulate_by_json(&mut engine);
+    }
+    return Ok(true);
+
 }
 
 fn prepare_command_line() -> bool{

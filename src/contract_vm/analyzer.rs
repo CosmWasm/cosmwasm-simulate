@@ -262,7 +262,10 @@ impl Analyzer{
 
     //load jsonschema file, translate from json string to func:params...
     pub fn try_load_json_schema(&mut self,dir : String) -> bool{
-        let all_json_file = std::fs::read_dir(dir).unwrap();
+        let all_json_file = match std::fs::read_dir(dir){
+            Err(_e) => return false,
+            Ok(f) => f
+        };
         for file in all_json_file {
             self.analyze_schema(file.unwrap().path().display().to_string());
         }
