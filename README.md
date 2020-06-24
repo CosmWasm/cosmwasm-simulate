@@ -1,7 +1,7 @@
 # cosmwasm-simulate
 Simulation tool of Cosmwasm smart contract
 
-#Overview
+# Overview
 cosmwasm-simulate is developed for Cosmwasm Smart Contract system, the main functions is:
 * Fast load&deploy contract without run WASMD
 * Fast call contract interface via command
@@ -14,7 +14,7 @@ cosmwasm-simulate is developed for Cosmwasm Smart Contract system, the main func
 ```shell script
 cargo +nightly build
 ```
-#Guide
+# Guide
 ## Simulate deploy
 * Run cosmwasm-simulate like:
 ```shell script
@@ -31,12 +31,12 @@ cosmwasm-simulate will auto load json schema file to analyze all message type an
 it will guide you to enter the correct command and data structure
 
 ### Example
-For example,we use repo`~/github.com/cosmwasm/cosmwasm-examples/erc20/contract.wasm` to test this tool   
-1 .Load wasm
+For example,we use repo`~/github.com/cosmwasm/cosmwasm-examples/erc20/contract.wasm` to test this tool，you can download erc20 contract example from [Cosmwasm-github](https://github.com/CosmWasm/cosmwasm-examples)   
+1 .Load wasm   
 ```shell script
 cosmwasm-simulate ~/github.com/cosmwasm/cosmwasm-examples/erc20/contract.wasm
 ```
-2 .Input `init`
+2 .Input `init`   
 ```shell script
 Input call type(init | handle | query):
 init
@@ -112,5 +112,5 @@ Call return msg [Execute Success]
 # Future
 * More customization function
 * Make cosmwasm-simulate visualization `(html+js+rpc)`
-* Upgrade with cosmosm
-* Other features
+* Upgrade and sync with cosmwasm
+* More features support
