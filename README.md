@@ -16,6 +16,12 @@ cargo +nightly build
 ```
 # Guide
 ## Simulate deploy
+* Download wasm file
+```
+cd ~/github.com/cosmwasm/cosmwasm-examples/erc20/
+wget https://github.com/CosmWasm/cosmwasm-examples/raw/master/erc20/contract.wasm
+```
+
 * Run cosmwasm-simulate like:
 ```shell script
 cosmwasm-simulate ~/github.com/cosmwasm/cosmwasm-examples/erc20/contract.wasm
@@ -24,7 +30,7 @@ cosmwasm-simulate ~/github.com/cosmwasm/cosmwasm-examples/erc20/contract.wasm
 ```shell script
 cosmwasm-simulate [wasm_file]
 ```
-##### Attention: You must make sure that must include directory: `schema` at same directory of`wasm_file`
+##### Attention: You must make sure that must include directory: [schema](https://github.com/CosmWasm/cosmwasm-examples/tree/master/erc20/schema) at same directory of`wasm_file`
 
 ## Simulate run
 cosmwasm-simulate will auto load json schema file to analyze all message type and structure type after code compile complete.   
