@@ -16,10 +16,27 @@ cargo +nightly build
 ```
 # Guide
 ## Simulate deploy
-* Run cosmwasm-simulate like:
+* Run cosmwasm-simulate:
 ```shell script
-cosmwasm-simulate ~/github.com/cosmwasm/cosmwasm-examples/erc20/contract.wasm
+cosmwasm-simulate -w contract1.wasm,ccontract2.wasm -s schema1,schema2 -m messages.json
 ```
+
+* messages.json content:
+```json
+{
+  "init": {"code_id": 1, "contract_addr": "c1-1", "message": {}},
+  "init": {"code_id": 1, "contract_addr": "c1-2", "message": {}},
+  "init": {"code_id": 2, "contract_addr": "c2", "message": {}},
+  "handle": {"contract_addr": "c1-1", "message": {}},
+  "handle": {"contract_addr": "c2", "message": {}},
+  "query": {"contract_addr": "c2", "message": {}},
+  "handle": {"contract_addr": "c1-2", "message": {}},
+  "handle": {"contract_addr": "c2", "message": {}},
+  "query": {"contract_addr": "c1-1", "message": {}},
+  "query": {"contract_addr": "c1-2", "message": {}}
+}
+```
+
 * Command like follow:
 ```shell script
 cosmwasm-simulate [wasm_file]
@@ -114,3 +131,4 @@ Call return msg [Execute Success]
 * Make cosmwasm-simulate visualization `(html+js+rpc)`
 * Upgrade and sync with cosmwasm
 * More features support
+
