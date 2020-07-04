@@ -3,14 +3,28 @@ use std::io::Read;
 
 #[derive(Debug)]
 pub struct Message {
+    pub contract_addr: String,
+    pub wasm_file: String,
     pub call_type: String,
     pub sender: String,
     pub message: String,
 }
 
 impl Message {
-    pub fn new(call_type: String, sender: String, message: String) -> Message {
+    pub fn default() -> Self {
         return Message {
+            contract_addr: String::new(),
+            wasm_file: String::new(),
+            call_type: String::new(),
+            sender: String::new(),
+            message: String::new(),
+        };
+    }
+
+    pub fn new(call_type: String, sender: String, message: String, wasm_file: String, contract_addr: String) -> Message {
+        return Message {
+            wasm_file: wasm_file,
+            contract_addr: contract_addr,
             call_type: call_type,
             sender: sender,
             message: message,
@@ -50,6 +64,8 @@ impl Message {
                     let mut call_type= String::new();
                     let mut sender= String::new();
                     let mut message= String::new();
+                    let mut wasm_file= String::new();
+                    let mut contract_addr= String::new();
 
                     for iter in mapping.iter() {
                         if iter.0 == "message" {
@@ -57,13 +73,23 @@ impl Message {
                         }
                         if iter.0 == "type" {
                             call_type = iter.1.to_string();
+                            call_type.retain(|c| c != '"');
                         }
                         if iter.0 == "sender" {
                             sender = iter.1.to_string();
+                            sender.retain(|c| c != '"');
+                        }
+                        if iter.0 == "wasm_file" {
+                            wasm_file = iter.1.to_string();
+                            wasm_file.retain(|c| c != '"');
+                        }
+                        if iter.0 == "contract_addr" {
+                            contract_addr = iter.1.to_string();
+                            contract_addr.retain(|c| c != '"');
                         }
                     }
 
-                    msgs.push(Message::new(call_type, sender, message));
+                    msgs.push(Message::new(call_type, sender, message, wasm_file, contract_addr));
                 }
             }
 

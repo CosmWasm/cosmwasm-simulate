@@ -41,13 +41,13 @@ fn compiler() -> Box<dyn Compiler> {
 
 impl ContractInstance
 {
-    pub fn new_instance(wasm_file: &str) -> Result<Self, String> {
-        let deps = mock::new_mock(20, &[], "fake_contract_addr");
+    pub fn new_instance(wasm_file: &str, contract_addr: &str) -> Result<Self, String> {
+        let deps = mock::new_mock(20, &[], contract_addr);
         let wasm = match analyzer::load_data_from_file(wasm_file) {
             Err(e) => return Err(e),
             Ok(code) => code,
         };
-        println!("Compiling code");
+        println!("Compiling [{}]...", wasm_file);
         let md = wasmer_runtime_core::compile_with(wasm.as_slice(), compiler().as_ref()).unwrap();
         let inst = cosmwasm_vm::Instance::from_code(wasm.as_slice(), deps, DEFAULT_GAS_LIMIT).unwrap();
         return Ok(ContractInstance::make_instance(md, inst, wasm_file.to_string()));
@@ -111,9 +111,10 @@ impl ContractInstance
 
         println!("{} = {}", key, value_str);
     }
-    pub fn call(&mut self, _sender: String, func_type: String, param: String) -> String {
+    pub fn call(&mut self, sender: String, contract_addr: String, func_type: String, param: String) -> String {
         println!("***************************call started***************************");
-        println!("executing func [{}] , params is {}", func_type, param);
+        println!("{}: contract address[{}], sender[{}], params[{}]",
+                 func_type, contract_addr, sender, param);
         let gas_init = self.instance.get_gas();
         if func_type == "\"init\"" || func_type == "init" {
             let init_result =
