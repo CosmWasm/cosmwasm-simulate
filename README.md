@@ -25,16 +25,16 @@ cosmwasm-simulate -m messages.json
 {
   "messages": [
       {
-        "wasm_file": "erc20/erc20.wasm",
+        "wasm_file": "wasm_code1/erc20.wasm",
         "type": "init", "contract_addr": "contract_addr1", "sender": "s1",
-        "message": {"name":"Test eth token","symbol":"eth","decimals":10,"initial_balances":[{"address":"account_addr1","amount":"10066"}]}
+        "message": {"name":"Test eth token","symbol":"ETH","decimals":10,"initial_balances":[{"address":"account_addr1","amount":"10066"}]}
       },
       {
-        "wasm_file": "erc21/erc20.wasm",
+        "wasm_file": "wasm_code2/erc20.wasm",
         "type": "init", "contract_addr": "contract_addr2", "sender": "s1",
-        "message": {"name":"Test btc token","symbol":"btc","decimals":10,"initial_balances":[{"address":"account_addr2","amount":"10067"}]}
+        "message": {"name":"Test btc token","symbol":"BTC","decimals":10,"initial_balances":[{"address":"account_addr2","amount":"10067"}]}
       },
-  
+
       {
         "type": "query", "contract_addr": "contract_addr1",
         "message": {"balance":{"address":"account_addr1"}}
@@ -49,11 +49,11 @@ cosmwasm-simulate -m messages.json
 
 * Output   
 ```
-load messages from: msg.json
-Compiling [erc20/erc20.wasm]...
-successfully loaded [erc20/erc20.wasm]
-Compiling [erc21/erc20.wasm]...
-successfully loaded [erc21/erc20.wasm]
+load messages from: messages.json
+Compiling [wasm_code1/erc20.wasm]...
+successfully loaded [wasm_code1/erc20.wasm]
+Compiling [wasm_code2/erc20.wasm]...
+successfully loaded [wasm_code2/erc20.wasm]
 ***************************call started***************************
 init: contract address[contract_addr1], sender[s1], params[{"decimals":10,"initial_balances":[{"address":"account_addr1","amount":"10066"}],"name":"Test eth token","symbol":"eth"}]
 DB Changed : [Insert]
