@@ -1,0 +1,13 @@
+{
+  "messages": [
+      {
+        "type": "init", "code_id": 1, "contract_addr": "c1-1", "sender": "s1",
+        "message": {"name":"Test okchain token","symbol":"OKT","decimals":10,"initial_balances":[{"address":"okchainaaaaaaaokch","amount":"10066"}]}
+      },
+
+      {
+        "type": "query", "contract_addr": "c1-2",
+        "message": {"balance":{"address":"okchainaaaaaaaokch"}}
+      }
+    ]
+}
