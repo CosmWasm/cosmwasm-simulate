@@ -3,7 +3,6 @@ extern crate clap;
 pub mod contract_vm;
 use clap::{Arg, App};
 use std::collections::HashMap;
-use core::panicking::panic_fmt;
 
 fn main() {
     let matches = App::new("cosmwasm-simulate")
