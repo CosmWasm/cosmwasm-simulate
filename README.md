@@ -15,7 +15,7 @@ cosmwasm-simulate is developed for Cosmwasm Smart Contract system, the main func
 cargo +nightly build
 ```
 # Guide
-## Simulate deploy
+## Simulate
 * Run cosmwasm-simulate:
 ```
 cosmwasm-simulate -m messages.json
@@ -47,14 +47,7 @@ cosmwasm-simulate -m messages.json
 }
 ```
 
-## Simulate run
-
-1. Start up simulate
-```
-cosmwasm-simulate -m messages.json
-```
-
-2. Output   
+* Output   
 ```
 load messages from: msg.json
 Compiling [erc20/erc20.wasm]...
@@ -83,7 +76,7 @@ Key        : balancesADDR0012345]
 Value      : [000862616c616e6365734144445230303132333435000000000000000000]
 DB Changed : [Insert]
 Key        : [configconstants]
-Value      : [{"name":"btc","symbol":"btc","decimals":9}]
+Value      : [{"name":"btc","symbol":"BTC","decimals":9}]
 DB Changed : [Insert]
 Key        : [configtotal_supply]
 Value      : [0006636f6e666967746f74616c5f737570706c79]

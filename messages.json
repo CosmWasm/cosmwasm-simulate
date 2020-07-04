@@ -3,12 +3,12 @@
       {
         "wasm_file": "erc20/erc20.wasm",
         "type": "init", "contract_addr": "contract_addr1", "sender": "s1",
-        "message": {"name":"Test eth token","symbol":"eth","decimals":10,"initial_balances":[{"address":"account_addr1","amount":"10066"}]}
+        "message": {"name":"Test eth token","symbol":"ETH","decimals":10,"initial_balances":[{"address":"account_addr1","amount":"10066"}]}
       },
       {
         "wasm_file": "erc21/erc20.wasm",
         "type": "init", "contract_addr": "contract_addr2", "sender": "s1",
-        "message": {"name":"Test btc token","symbol":"btc","decimals":10,"initial_balances":[{"address":"account_addr2","amount":"10067"}]}
+        "message": {"name":"Test btc token","symbol":"BTC","decimals":10,"initial_balances":[{"address":"account_addr2","amount":"10067"}]}
       },
 
       {
