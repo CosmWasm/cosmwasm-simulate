@@ -11,112 +11,101 @@ cosmwasm-simulate is developed for Cosmwasm Smart Contract system, the main func
 * Dynamic calcuate and printing gas used during contract execute 
 * Easy to test smart contract without input a json string
 # Build
-```shell script
+```
 cargo +nightly build
 ```
 # Guide
 ## Simulate deploy
-* Download wasm file
+* Run cosmwasm-simulate:
 ```
-cd ~/github.com/cosmwasm/cosmwasm-examples/erc20/
-wget https://github.com/CosmWasm/cosmwasm-examples/raw/master/erc20/contract.wasm
+cosmwasm-simulate -m messages.json
 ```
-
-* Run cosmwasm-simulate like:
-```shell script
-cosmwasm-simulate ~/github.com/cosmwasm/cosmwasm-examples/erc20/contract.wasm
+* messages.json content:
 ```
-* Command like follow:
-```shell script
-cosmwasm-simulate [wasm_file]
-```
-##### Attention: You must make sure that must include directory: [schema](https://github.com/CosmWasm/cosmwasm-examples/tree/master/erc20/schema) at same directory of`wasm_file`
-
-## Simulate run
-cosmwasm-simulate will auto load json schema file to analyze all message type and structure type after code compile complete.   
-it will guide you to enter the correct command and data structure
-
-### Example
-For example,we use repo`~/github.com/cosmwasm/cosmwasm-examples/erc20/contract.wasm` to test this tool，you can download erc20 contract example from [Cosmwasm-github](https://github.com/CosmWasm/cosmwasm-examples)   
-1 .Load wasm   
-```shell script
-cosmwasm-simulate ~/github.com/cosmwasm/cosmwasm-examples/erc20/contract.wasm
-```
-2 .Input `init`   
-```shell script
-Input call type(init | handle | query):
-init
-```
-3 .Input Message type name`InitMsg` which will print out on screen
-```shell script   
-Input Call param from [ Constants | HandleMsg | QueryMsg | InitMsg | BalanceResponse | AllowanceResponse |  ]
-InitMsg
-InitMsg {
-	decimals : integer
-	initial_balances : InitialBalance :{
-		address : HumanAddr
-		amount : Uint128
-	}
-	name : string
-	symbol : string
+{
+  "messages": [
+      {
+        "wasm_file": "erc20/erc20.wasm",
+        "type": "init", "contract_addr": "contract_addr1", "sender": "s1",
+        "message": {"name":"Test eth token","symbol":"eth","decimals":10,"initial_balances":[{"address":"account_addr1","amount":"10066"}]}
+      },
+      {
+        "wasm_file": "erc21/erc20.wasm",
+        "type": "init", "contract_addr": "contract_addr2", "sender": "s1",
+        "message": {"name":"Test btc token","symbol":"btc","decimals":10,"initial_balances":[{"address":"account_addr2","amount":"10067"}]}
+      },
+  
+      {
+        "type": "query", "contract_addr": "contract_addr1",
+        "message": {"balance":{"address":"account_addr1"}}
+      },
+      {
+        "type": "query", "contract_addr": "contract_addr2",
+        "message": {"balance":{"address":"account_addr2"}}
+      }
+    ]
 }
 ```
-4 .Input every member of InigMsg step by step
-```shell script
-input [decimals]:
-9
-input [initial_balances]:
-input 	[address : HumanAddr]:
-ADDR0012345
-input 	[amount : Uint128]:
-112233445
-input [name]:
-OKB
-input [symbol]:
-OKBT
+
+## Simulate run
+
+1. Start up simulate
 ```
-5 .Finish init  
-The tool will print DB Changes and Gas used on screen
-```shell script
+cosmwasm-simulate -m messages.json
+```
+
+2. Output   
+```
+load messages from: msg.json
+Compiling [erc20/erc20.wasm]...
+successfully loaded [erc20/erc20.wasm]
+Compiling [erc21/erc20.wasm]...
+successfully loaded [erc21/erc20.wasm]
 ***************************call started***************************
-executing func [init] , params is {"decimals":9,"initial_balances":[{"address":"ADDR0012345","amount":"112233445"}],"name":"OKB","symbol":"OKBT"}
+init: contract address[contract_addr1], sender[s1], params[{"decimals":10,"initial_balances":[{"address":"account_addr1","amount":"10066"}],"name":"Test eth token","symbol":"eth"}]
 DB Changed : [Insert]
 Key        : balancesADDR0012345]
 Value      : [000862616c616e6365734144445230303132333435000000000000000000]
 DB Changed : [Insert]
 Key        : [configconstants]
-Value      : [{"name":"OKB","symbol":"OKBT","decimals":9}]
+Value      : [{"name":"eth","symbol":"eth","decimals":9}]
 DB Changed : [Insert]
 Key        : [configtotal_supply]
 Value      : [0006636f6e666967746f74616c5f737570706c79]
 init msg.data: =
-Gas used   : 59422
+init msg.data: = 
+Gas used   : 61390
 ***************************call finished***************************
-Call return msg [Execute Success]
-```
-6 .call query   
-```shell script
-Input call type(init | handle | query):
-query
-Input Call param from [ Constants | HandleMsg | QueryMsg | InitMsg | BalanceResponse | AllowanceResponse |  ]
-QueryMsg
-Input Call param from [ allowance | balance |  ]
-balance
-```
-7 .Input every member of QueryMsg step by step
-```shell script
-input [address]:
-ADDR0012345
-JsonMsg:{"balance":{"address":"ADDR0012345"}}
 ***************************call started***************************
-executing func [query] , params is {"balance":{"address":"ADDR0012345"}}
-query msg.data: = {"balance":"112233445"}
-Gas used   : 19239
+init: contract address[contract_addr2], sender[s1], params[{"decimals":10,"initial_balances":[{"address":"account_addr2","amount":"10067"}],"name":"Test btc token","symbol":"btc"}]
+DB Changed : [Insert]
+Key        : balancesADDR0012345]
+Value      : [000862616c616e6365734144445230303132333435000000000000000000]
+DB Changed : [Insert]
+Key        : [configconstants]
+Value      : [{"name":"btc","symbol":"btc","decimals":9}]
+DB Changed : [Insert]
+Key        : [configtotal_supply]
+Value      : [0006636f6e666967746f74616c5f737570706c79]
+init msg.data: =
+init msg.data: = 
+Gas used   : 61390
 ***************************call finished***************************
-Call return msg [Execute Success]
+***************************call started***************************
+query: contract address[contract_addr1], sender[], params[{"balance":{"address":"account_addr1"}}]
+query msg.data: = {"balance":"10066"}
+Gas used   : 18023
+***************************call finished***************************
+***************************call started***************************
+query: contract address[contract_addr2], sender[], params[{"balance":{"address":"account_addr2"}}]
+query msg.data: = {"balance":"10067"}
+Gas used   : 18023
+***************************call finished***************************
 ```
+
 # Future
 * More customization function
 * Make cosmwasm-simulate visualization `(html+js+rpc)`
 * Upgrade and sync with cosmwasm
 * More features support
+
