@@ -89,6 +89,29 @@ impl Message {
                         }
                     }
 
+                    if call_type == "init" {
+                        if wasm_file.is_empty() {
+                            panic!("A wasm file is expected for {}", message)
+                        }
+                        if contract_addr.is_empty() {
+                            panic!("A contract address is expected for {}", message)
+                        }
+
+                    } else if call_type == "handle" {
+                        if sender.is_empty() {
+                            panic!("A sender address is expected for {}", message)
+                        }
+                        if contract_addr.is_empty() {
+                            panic!("A contract address is expected for {}", message)
+                        }
+                    } else if call_type == "query" {
+                        if contract_addr.is_empty() {
+                            panic!("A contract address is expected for {}", message)
+                        }
+                    } else {
+                        panic!("Incorrect type: {}!. Only [query | init | handle] is expected.", call_type)
+                    }
+
                     msgs.push(Message::new(call_type, sender, message, wasm_file, contract_addr));
                 }
             }

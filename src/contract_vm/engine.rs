@@ -116,7 +116,7 @@ impl ContractInstance
         println!("{}: contract address[{}], sender[{}], params[{}]",
                  func_type, contract_addr, sender, param);
         let gas_init = self.instance.get_gas();
-        if func_type == "\"init\"" || func_type == "init" {
+        if func_type == "init" {
             let init_result =
                 cosmwasm_vm::call_init::<_, _, _, cosmwasm_std::Never>(&mut self.instance, &self.env, param.as_bytes());
             let msg = match init_result {
@@ -137,7 +137,7 @@ impl ContractInstance
                 Some(d) => d
             };
             ContractInstance::dump_result("init msg.data:", data.0.as_slice());
-        } else if func_type == "handle" || func_type == "\"handle\"" {
+        } else if func_type == "handle" {
             let handle_result = cosmwasm_vm::call_handle::<_, _, _, cosmwasm_std::Never>(&mut self.instance, &self.env, param.as_bytes());
             let msg = match handle_result {
                 Ok(data) => match data {
@@ -158,7 +158,7 @@ impl ContractInstance
                 Some(d) => d
             };
             ContractInstance::dump_result("handle msg.data:", data.0.as_slice());
-        } else if func_type == "query" || func_type == "\"query\"" {
+        } else if func_type == "query" {
             let query_result = cosmwasm_vm::call_query::<_, _, _>(&mut self.instance, param.as_bytes());
             let msg = match query_result {
                 Ok(data) => match data {
