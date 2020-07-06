@@ -112,9 +112,9 @@ impl ContractInstance
         println!("{} = {}", key, value_str);
     }
     pub fn call(&mut self, sender: String, contract_addr: String, func_type: String, param: String) -> String {
-        println!("***************************call started***************************");
-        println!("{}: contract address[{}], sender[{}], params[{}]",
-                 func_type, contract_addr, sender, param);
+        println!("***************************[{}] call started***************************", func_type);
+        println!("sender<{}>, contract addr<{}>, message<{}>",
+                 sender, contract_addr, param);
         let gas_init = self.instance.get_gas();
         if func_type == "init" {
             let init_result =
@@ -180,7 +180,7 @@ impl ContractInstance
         }
         let gas_used = gas_init - self.instance.get_gas();
         println!("Gas used   : {}", gas_used);
-        println!("***************************call finished***************************");
+        println!("***************************[{}] call finished***************************", func_type);
         return "Execute Success".to_string();
     }
 }
