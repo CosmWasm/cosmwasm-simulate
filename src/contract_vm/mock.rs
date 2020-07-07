@@ -1,143 +1,148 @@
-use std::collections::BTreeMap;
-#[cfg(feature = "iterator")]
-use std::{
-    iter,
-    ops::{Bound, RangeBounds},
-};
+use cosmwasm_vm::{Api, Instance, Extern, call_query, call_handle};
+use cosmwasm_vm::testing::{mock_env, MockApi, MockInstanceOptions};
+use cosmwasm_std::{coins, HandleResponse, WasmQuery,
+                   QuerierResult, SystemError, CosmosMsg, WasmMsg, StdResult, HumanAddr, Coin, Env,};
+use kv::{Config, Store, Raw};
+use std::collections::HashMap;
+use std::sync::Mutex;
+// use rand::{thread_rng, Rng};
+// use rand::distributions::Alphanumeric;
 
+use crate::contract_vm::storage::MyMockStorage;
+use crate::contract_vm::querier::{MyMockQuerier, CallBackFunc};
 
-use cosmwasm_vm::{ReadonlyStorage, FfiResult, Storage, Api, FfiError, Extern};
-use cosmwasm_std::{HumanAddr, CanonicalAddr, Binary, Coin};
-use crate::contract_vm::watcher;
-
-///mock storage
-#[derive(Default, Debug)]
-pub struct MockStorage {
-    data: BTreeMap<Vec<u8>, Vec<u8>>,
+#[derive(Clone)]
+struct ContractInfo {
+    name: String,
+    code: Vec<u8>,
 }
 
-impl MockStorage {
-    pub fn new() -> Self {
-        MockStorage::default()
+lazy_static! {
+    static ref TEST_STORE: Store = Store::new(Config::new("./tmp").temporary(true)).unwrap();
+    static ref CONTRACT_INFO: Mutex<HashMap<HumanAddr, ContractInfo>> = {
+        let mut m = HashMap::new();
+        Mutex::new(m)
+    };
+}
+
+pub fn mock_env_addr<A: Api>(api: &A, sender: &HumanAddr, contract_address: &HumanAddr, sent: &[Coin]) -> Env {
+    let mut env = mock_env(api, sender, sent);
+    env.contract.address = api.canonical_address(contract_address).unwrap();
+    env
+}
+
+pub fn mock_instance<'a>(
+    wasm: &[u8],
+    contract_balance: &[Coin],
+    contract_address: HumanAddr,
+    contract_storage: MyMockStorage<'a>,
+    call_back: CallBackFunc,
+) -> Instance<MyMockStorage<'a>, MockApi, MyMockQuerier> {
+    // check_wasm(wasm, &options.supported_features).unwrap();
+
+    let options = MockInstanceOptions {
+        contract_balance: Some(contract_balance),
+        ..Default::default()
+    };
+
+    // merge balances
+    let mut balances = options.balances.to_vec();
+    if let Some(contract_balance) = options.contract_balance {
+        // Remove old entry if exists
+        if let Some(pos) = balances.iter().position(|item| *item.0 == contract_address) {
+            balances.remove(pos);
+        }
+        balances.push((&contract_address, contract_balance));
+    }
+
+    let deps = Extern {
+        api: MockApi::new(options.canonical_address_length),
+        querier: MyMockQuerier::new(&balances, call_back),
+        storage: contract_storage,
+    };
+    Instance::from_code(wasm, deps, options.gas_limit).unwrap()
+}
+
+pub fn install<'a>(contract_address: HumanAddr, contract_name: String, contract_code: Vec<u8>) -> Instance<MyMockStorage<'a>, MockApi, MyMockQuerier> {
+    let mut contract_bucket = TEST_STORE.bucket::<Raw, Raw>(Some(contract_name.clone().as_str())).unwrap();
+    let mut contract_store = MyMockStorage::new(contract_bucket);
+    let mut contract_deps = mock_instance(contract_code.clone().as_slice(), &[],
+                                          contract_address.clone(), contract_store, query_call_back);
+
+    let mut contract_map = CONTRACT_INFO.lock().unwrap();
+    contract_map.insert(contract_address.clone(), ContractInfo{
+        name: contract_name,
+        code: contract_code
+    });
+    // you must drop it here, or it will hold the lock and block the test process
+    drop(contract_map);
+
+    contract_deps
+}
+
+pub fn instantiate<'a>(contract_addr: HumanAddr) -> Instance<MyMockStorage<'a>, MockApi, MyMockQuerier> {
+    let mut contract_map = CONTRACT_INFO.lock().unwrap();
+    let contract_info = contract_map.get(&contract_addr.clone()).unwrap();
+
+    let contract_bucket = TEST_STORE.bucket::<Raw, Raw>(Some(contract_info.name.as_str())).unwrap();
+    let mut contract_store = MyMockStorage::new(contract_bucket);
+    let mut contract_deps = mock_instance(contract_info.code.as_slice(), &[],
+                                          contract_addr, contract_store, query_call_back);
+
+    // you must drop it here, or it will hold the lock and block the test process
+    drop(contract_map);
+
+    contract_deps
+}
+
+fn query_call_back(request: &WasmQuery) -> QuerierResult{
+    match request{
+        WasmQuery::Smart{ contract_addr, msg } => {
+            let mut query_deps= instantiate(contract_addr.clone());
+            let res = call_query(&mut query_deps, msg.as_slice()).unwrap();
+            Ok(res)
+        }
+        WasmQuery::Raw{ contract_addr, key } => {
+            Err(SystemError::NoSuchContract { addr: contract_addr.clone() })
+        }
     }
 }
 
+pub fn handler_resp(res:HandleResponse, caller: HumanAddr) -> StdResult<HandleResponse>{
+    let msgs_itr = res.messages.iter();
+    for msg in msgs_itr {
+        match msg{
+            CosmosMsg::Wasm(wasm_msg) => {
+                match wasm_msg{
+                    WasmMsg::Execute{ contract_addr, msg, send } => {
+                        let mut handler_deps= instantiate(contract_addr.clone());
+                        let env = mock_env_addr(&handler_deps.api, &caller, &contract_addr, &coins(100, "eth"));
+                        let res = call_handle(&mut handler_deps, &env, msg.as_slice()).unwrap().unwrap();
 
-impl ReadonlyStorage for MockStorage {
-    fn get(&self, key: &[u8]) -> FfiResult<Option<Vec<u8>>> {
-        Ok(self.data.get(key).cloned())
-    }
-
-    #[cfg(feature = "iterator")]
-    fn range<'a>(
-        &'a self,
-        start: Option<&[u8]>,
-        end: Option<&[u8]>,
-        order: Order,
-    ) -> FfiResult<Box<dyn Iterator<Item = FfiResult<KV>> + 'a>> {
-        let bounds = range_bounds(start, end);
-
-        // BTreeMap.range panics if range is start > end.
-        // However, this cases represent just empty range and we treat it as such.
-        match (bounds.start_bound(), bounds.end_bound()) {
-            (Bound::Included(start), Bound::Excluded(end)) if start > end => {
-                return Ok(Box::new(iter::empty()));
+                        if res.messages.len() > 0 {
+                            handler_resp(res, contract_addr.clone());
+                        }
+                    }
+                    _ => {
+                    }
+                }
             }
-            _ => {}
+            _ => {
+            }
         }
-
-        let iter = self.data.range(bounds);
-        Ok(match order {
-            Order::Ascending => Box::new(iter.map(clone_item).map(FfiResult::Ok)),
-            Order::Descending => Box::new(iter.rev().map(clone_item).map(FfiResult::Ok)),
-        })
-    }
-}
-
-impl Storage for MockStorage {
-
-    fn set(&mut self, key: &[u8], value: &[u8]) -> FfiResult<()> {
-        self.data.insert(key.to_vec(), value.to_vec());
-        watcher::logger_storage_event_insert(key,value);
-        Ok(())
     }
 
-    fn remove(&mut self, key: &[u8]) -> FfiResult<()> {
-        self.data.remove(key);
-
-        Ok(())
-    }
+    Ok(HandleResponse::default())
 }
 
-impl MockStorage{
-
-}
-
-//mock api
-#[derive(Copy, Clone)]
-pub struct MockApi {
-    canonical_length: usize,
-}
-
-impl MockApi {
-    pub fn new(canonical_length: usize) -> Self {
-        MockApi { canonical_length }
-    }
-}
-
-impl Default for MockApi {
-    fn default() -> Self {
-        Self::new(20)
-    }
-}
-
-impl Api for MockApi {
-    fn canonical_address(&self, human: &HumanAddr) -> FfiResult<CanonicalAddr> {
-        // Dummy input validation. This is more sophisticated for formats like bech32, where format and checksum are validated.
-        if human.len() < 3 {
-            return Err(FfiError::other("Invalid input: human address too short"));
-        }
-        if human.len() > self.canonical_length {
-            return Err(FfiError::other("Invalid input: human address too long"));
-        }
-
-        let mut out = Vec::from(human.as_str());
-        let append = self.canonical_length - out.len();
-        if append > 0 {
-            out.extend(vec![0u8; append]);
-        }
-        Ok(CanonicalAddr(Binary(out)))
-    }
-
-    fn human_address(&self, canonical: &CanonicalAddr) -> FfiResult<HumanAddr> {
-        if canonical.len() != self.canonical_length {
-            return Err(FfiError::other(
-                "Invalid input: canonical address length not correct",
-            ));
-        }
-
-        // remove trailing 0's (TODO: fix this - but fine for first tests)
-        let trimmed: Vec<u8> = canonical
-            .as_slice()
-            .iter()
-            .cloned()
-            .filter(|&x| x != 0)
-            .collect();
-        // decode UTF-8 bytes into string
-        let human = String::from_utf8(trimmed)
-            .map_err(|_| FfiError::other("Could not parse human address result as utf-8"))?;
-        Ok(HumanAddr(human))
-    }
-}
-
-pub fn new_mock(canonical_length: usize,
-                contract_balance: &[Coin],
-                contract_addr : &str
-) -> Extern<MockStorage,MockApi,cosmwasm_vm::testing::MockQuerier>{
-    let human_addr = HumanAddr::from(contract_addr);
-    Extern {
-        storage: MockStorage::default(),
-        api: MockApi::new(canonical_length),
-        querier: cosmwasm_vm::testing::MockQuerier::new(&[(&human_addr, contract_balance)]),
-    }
-}
+// pub fn generate_address() -> HumanAddr{
+//     let rand_string: String = thread_rng()
+//         .sample_iter(&Alphanumeric)
+//         .take(12)
+//         .collect();
+//
+//     let mut address_prefix = "cosmos".to_string();
+//     address_prefix += &rand_string.to_lowercase();
+//
+//     HumanAddr(address_prefix)
+// }
