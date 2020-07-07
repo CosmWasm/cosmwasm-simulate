@@ -1,5 +1,8 @@
 extern crate clap;
 
+#[macro_use]
+extern crate lazy_static;
+
 pub mod contract_vm;
 use clap::{Arg, App};
 use std::collections::HashMap;

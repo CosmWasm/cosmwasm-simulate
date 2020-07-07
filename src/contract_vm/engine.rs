@@ -12,9 +12,12 @@ use wasmer_middleware_common::metering;
 
 use wasmer_singlepass_backend::ModuleCodeGenerator as SinglePassMCG;
 use self::cosmwasm_vm::{Instance};
-use self::cosmwasm_vm::testing::{MockQuerier};
-use self::cosmwasm_std::{Uint128, Binary};
-use crate::contract_vm::{mock, analyzer};
+use self::cosmwasm_std::{Uint128, Binary, HumanAddr, ContractInfo, HandleResponse};
+use crate::contract_vm::mock::{install, mock_env_addr, handler_resp};
+use crate::contract_vm::querier::MyMockQuerier;
+use crate::contract_vm::storage::MyMockStorage;
+use crate::contract_vm::analyzer;
+use self::cosmwasm_vm::testing::MockApi;
 
 static DEFAULT_GAS_LIMIT: u64 = 500_000;
 static COMPILE_GAS_LIMIT: u64 = 10_000_000_000;
@@ -22,9 +25,9 @@ static COMPILE_GAS_LIMIT: u64 = 10_000_000_000;
 
 pub struct ContractInstance {
     pub module: Module,
-    pub instance: Instance<mock::MockStorage, mock::MockApi, MockQuerier>,
+    pub instance: Instance<MyMockStorage<'static>, MockApi, MyMockQuerier>,
     pub wasm_file: String,
-    pub env: cosmwasm_std::Env,
+    // pub env: cosmwasm_std::Env,
     pub analyzer: analyzer::Analyzer,
 }
 
@@ -39,49 +42,55 @@ fn compiler() -> Box<dyn Compiler> {
     Box::new(c)
 }
 
-impl ContractInstance
-{
+impl<'a> ContractInstance {
     pub fn new_instance(wasm_file: &str, contract_addr: &str) -> Result<Self, String> {
-        let deps = mock::new_mock(20, &[], contract_addr);
+        // let deps = mock::new_mock(20, &[], contract_addr);
         let wasm = match analyzer::load_data_from_file(wasm_file) {
             Err(e) => return Err(e),
             Ok(code) => code,
         };
         println!("Compiling [{}]...", wasm_file);
         let md = wasmer_runtime_core::compile_with(wasm.as_slice(), compiler().as_ref()).unwrap();
-        let inst = cosmwasm_vm::Instance::from_code(wasm.as_slice(), deps, DEFAULT_GAS_LIMIT).unwrap();
+        let mut inst = install(HumanAddr(contract_addr.clone().to_string()),
+                                    contract_addr.clone().to_string(), wasm);
+
+        // let inst = cosmwasm_vm::Instance::from_code(wasm.as_slice(), deps, DEFAULT_GAS_LIMIT).unwrap();
         return Ok(ContractInstance::make_instance(md, inst, wasm_file.to_string()));
     }
 
-    fn make_instance(md: Module, inst: cosmwasm_vm::Instance<mock::MockStorage, mock::MockApi, MockQuerier>, file: String) -> ContractInstance {
+    fn make_instance(md: Module, inst: cosmwasm_vm::Instance<MyMockStorage<'a>, MockApi, MyMockQuerier>, file: String) -> ContractInstance {
         return ContractInstance {
             module: md,
             instance: inst,
             wasm_file: file,
-            env: ContractInstance::build_mock_env(),
+            // env: ContractInstance::build_mock_env(),
             analyzer: analyzer::Analyzer::default(),
         };
     }
 
-    fn build_mock_env() -> cosmwasm_std::Env {
-        return cosmwasm_std::Env {
-            block: cosmwasm_std::BlockInfo {
-                height: 0,
-                time: 0,
-                chain_id: "okchain".to_string(),
-            },
-            message: cosmwasm_std::MessageInfo {
-                sender: cosmwasm_std::CanonicalAddr {
-                    0: cosmwasm_std::Binary::from_base64("b2tjaGFpbl9rYW1pZA==").unwrap()
-                },
-                sent_funds: vec![cosmwasm_std::Coin {
-                    denom: "okt".to_string(),
-                    amount: Uint128(100000000),
-                }],
-            },
-            contract: Default::default(),
-        };
-    }
+    // fn build_mock_env(sender: String, contract_addr: String) -> cosmwasm_std::Env {
+    //     return cosmwasm_std::Env {
+    //         block: cosmwasm_std::BlockInfo {
+    //             height: 0,
+    //             time: 0,
+    //             chain_id: "okchain".to_string(),
+    //         },
+    //         message: cosmwasm_std::MessageInfo {
+    //             sender: cosmwasm_std::CanonicalAddr {
+    //                 0: cosmwasm_std::Binary::from_base64(sender.as_str()).unwrap()
+    //             },
+    //             sent_funds: vec![cosmwasm_std::Coin {
+    //                 denom: "okt".to_string(),
+    //                 amount: Uint128(100000000),
+    //             }],
+    //         },
+    //         contract: ContractInfo {
+    //             address: cosmwasm_std::CanonicalAddr {
+    //                 0: cosmwasm_std::Binary::from_base64(contract_addr.as_str()).unwrap()
+    //             },
+    //         },
+    //     };
+    // }
 
     pub fn show_module_info(&self) {
         println!("showing wasm module info for [{}]", self.wasm_file);
@@ -113,12 +122,13 @@ impl ContractInstance
     }
     pub fn call(&mut self, sender: String, contract_addr: String, func_type: String, param: String) -> String {
         println!("***************************[{}] call started***************************", func_type);
-        println!("sender<{}>, contract addr<{}>, message<{}>",
-                 sender, contract_addr, param);
+        println!("sender<{}>, contract addr<{}>, message<{}>", sender, contract_addr, param);
+
         let gas_init = self.instance.get_gas();
         if func_type == "init" {
+            let env = mock_env_addr(&self.instance.api, &HumanAddr(sender), &HumanAddr(contract_addr), &[]);
             let init_result =
-                cosmwasm_vm::call_init::<_, _, _, cosmwasm_std::Never>(&mut self.instance, &self.env, param.as_bytes());
+                cosmwasm_vm::call_init::<_, _, _, cosmwasm_std::Never>(&mut self.instance, &env, param.as_bytes());
             let msg = match init_result {
                 Ok(data) => match data {
                     Ok(resp) => resp,
@@ -138,15 +148,18 @@ impl ContractInstance
             };
             ContractInstance::dump_result("init msg.data:", data.0.as_slice());
         } else if func_type == "handle" {
-            let handle_result = cosmwasm_vm::call_handle::<_, _, _, cosmwasm_std::Never>(&mut self.instance, &self.env, param.as_bytes());
-            let msg = match handle_result {
-                Ok(data) => match data {
-                    Ok(resp) => resp,
-                    Err(err) => {
-                        println!("Error {}", err);
-                        return "ERROR      :execute query failed".to_string();
-                    }
-                },
+            let env = mock_env_addr(&self.instance.api, &HumanAddr(sender), &HumanAddr(contract_addr.clone()), &[]);
+            let handle_result = cosmwasm_vm::call_handle::<_, _, _, cosmwasm_std::Never>(&mut self.instance, &env, param.as_bytes()).expect("VM error");
+            let res = match handle_result {
+                Ok(data) => handler_resp(data, HumanAddr(contract_addr)),
+                Err(err) => {
+                    println!("Error {}", err);
+                    return "ERROR      :execute query failed".to_string();
+                }
+            };
+
+            let msg = match res {
+                Ok(data) => data,
                 Err(err) => {
                     println!("Error {}", err);
                     return "ERROR      :execute query failed".to_string();

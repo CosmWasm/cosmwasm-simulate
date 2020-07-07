@@ -1,0 +1,41 @@
+{
+  "messages": [
+    {
+        "wasm_file": "wasm_erc20_code/erc20.wasm",
+        "type": "init", "contract_addr": "contract_addr1", "sender": "account_addr1",
+        "message": {"name":"Test eth token","symbol":"ETH","decimals":10,"initial_balances":[{"address":"account_addr1","amount":"10000"}, {"address":"account_addr2","amount":"10000"}]}
+    },
+    {
+      "wasm_file": "wasm_dns_code/dns.wasm",
+      "type": "init", "contract_addr": "contract_addr2", "sender": "account_addr1",
+      "message": {"erc20":"contract_addr1"}
+    },
+    {
+      "type": "handle", "contract_addr": "contract_addr2", "sender": "account_addr1",
+      "message": {"register_domain":{"domain":"www.cosmos.com"}}
+    },
+    {
+      "type": "query", "contract_addr": "contract_addr2",
+      "message": {"get_owner":{"domain":"www.cosmos.com"}}
+    },
+    {
+      "type": "handle", "contract_addr": "contract_addr1", "sender": "account_addr2",
+      "message": {"approve":{"spender":"contract_addr2","amount":"600"}}
+    },
+    {
+      "type": "query", "contract_addr": "contract_addr1",
+      "message": {"allowance":{"owner":"account_addr2", "spender": "contract_addr2"}}
+    },
+    {
+      "type": "handle", "contract_addr": "contract_addr2", "sender": "account_addr1",
+      "message": {"sell_domain":{"buyer":"account_addr2","domain":"www.cosmos.com"}}
+    },
+    {
+      "type": "query", "contract_addr": "contract_addr2",
+      "message": {"get_owner":{"domain":"www.cosmos.com"}}
+    },{
+      "type": "query", "contract_addr": "contract_addr1",
+      "message": {"allowance":{"owner":"account_addr2", "spender": "contract_addr2"}}
+    }
+  ]
+}

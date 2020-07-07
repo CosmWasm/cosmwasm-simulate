@@ -2,4 +2,5 @@
 
 set -e
 cargo +nightly build
-target/debug/cosmwasm-simulate -m messages.json
+target/debug/cosmwasm-simulate -m messages-dns.json
+#target/debug/cosmwasm-simulate -m messages-erc20.json
