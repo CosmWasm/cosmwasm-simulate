@@ -52,3 +52,4 @@ contract.wasm
 cosmwasm-simulate
 target/
 schema/
+tmp/
