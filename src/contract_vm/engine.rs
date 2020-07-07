@@ -13,8 +13,9 @@ use wasmer_middleware_common::metering;
 use wasmer_singlepass_backend::ModuleCodeGenerator as SinglePassMCG;
 use self::cosmwasm_vm::{Instance};
 use self::cosmwasm_vm::testing::{MockQuerier};
-use self::cosmwasm_std::{Uint128, Binary};
+use self::cosmwasm_std::{Uint128, Binary, HumanAddr};
 use crate::contract_vm::{mock, analyzer};
+use crate::contract_vm::utils::Utils;
 
 static DEFAULT_GAS_LIMIT: u64 = 500_000;
 static COMPILE_GAS_LIMIT: u64 = 10_000_000_000;
@@ -71,9 +72,7 @@ impl ContractInstance
                 chain_id: "okchain".to_string(),
             },
             message: cosmwasm_std::MessageInfo {
-                sender: cosmwasm_std::CanonicalAddr {
-                    0: cosmwasm_std::Binary::from_base64("b2tjaGFpbl9rYW1pZA==").unwrap()
-                },
+                sender: Default::default(),
                 sent_funds: vec![cosmwasm_std::Coin {
                     denom: "okt".to_string(),
                     amount: Uint128(100000000),
@@ -138,6 +137,14 @@ impl ContractInstance
             };
             ContractInstance::dump_result("init msg.data:", data.0.as_slice());
         } else if func_type == "handle" {
+            // assemble env with the given sender address from JSON msg
+            match Utils::canonical_address(&HumanAddr(sender)) {
+                Ok(sender_addr) => self.env.message.sender = sender_addr,
+                Err(e) => {
+                    println!("Error {}", e);
+                    return "ERROR      :execute query failed".to_string()
+                }
+            }
             let handle_result = cosmwasm_vm::call_handle::<_, _, _, cosmwasm_std::Never>(&mut self.instance, &self.env, param.as_bytes());
             let msg = match handle_result {
                 Ok(data) => match data {
