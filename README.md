@@ -20,7 +20,7 @@ cargo +nightly build
 ```
 cosmwasm-simulate -m messages.json
 ```
-* messages.json content:
+* messages.json content (**Warning**: We only support address with length less than or equal to 32, both contract address and user address):
 ```
 {
   "messages": [

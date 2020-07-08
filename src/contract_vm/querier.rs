@@ -83,8 +83,8 @@ impl StdMockQuerier {
     // set a new balance for the given address and return the old balance
     pub fn update_balance<U: Into<HumanAddr>>(
         &mut self,
-        addr: U,
-        balance: Vec<Coin>,
+        _addr: U,
+        _balance: Vec<Coin>,
     ) -> Option<Vec<Coin>> {
         None
     }
@@ -140,7 +140,7 @@ impl Default for CustomizationWasmQuerier{
     }
 }
 
-pub fn default_call_back(request: &WasmQuery) -> stdQuerierResult {
+pub fn default_call_back(_request: &WasmQuery) -> stdQuerierResult {
     Err(SystemError::UnsupportedRequest { kind: "Wasm query".to_string() })
 }
 
