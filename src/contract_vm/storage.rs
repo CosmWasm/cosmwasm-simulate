@@ -1,5 +1,9 @@
 use cosmwasm_vm::{ReadonlyStorage, FfiResult, Storage};
-use kv::{Raw, Store, Config, Item, Error, Bucket};
+
+use kv::{Raw, Store, Config, Bucket};
+
+#[cfg(feature = "iterator")]
+use kv::{Item, Error};
 
 #[cfg(feature = "iterator")]
 use cosmwasm_std::{Order};
@@ -89,7 +93,7 @@ impl<'a> ReadonlyStorage for MyMockStorage<'static> {
 
 impl<'a> Storage for MyMockStorage<'static> {
     fn set(&mut self, key: &[u8], value: &[u8]) -> FfiResult<()> {
-        self.bucket.set(key.to_vec(), value.to_vec());
+        let _ = self.bucket.set(key.to_vec(), value.to_vec());
         // self.bucket.flush();
         watcher::logger_storage_event_insert(key,value);
 
@@ -97,7 +101,7 @@ impl<'a> Storage for MyMockStorage<'static> {
     }
 
     fn remove(&mut self, key: &[u8]) -> FfiResult<()> {
-        self.bucket.remove(key);
+        let _ = self.bucket.remove(key);
         // self.bucket.flush();
 
         Ok(())
