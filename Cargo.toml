@@ -11,8 +11,8 @@ iterator = ["cosmwasm-std/iterator"]
 [dependencies]
 clap = "~2.32"
 wasmer-singlepass-backend = "0.17"
-cosmwasm-vm = "0.8"
-cosmwasm-std = "0.8"
+cosmwasm-vm = {git = "https://github.com/KamiD/cosmwasm", branch="v0.8.0-debug"}
+cosmwasm-std = {git = "https://github.com/KamiD/cosmwasm", branch="v0.8.0-debug"}
 wasmer-runtime-core = "0.17"
 wasmer-middleware-common = "0.17"
 websocket="0.24.0"

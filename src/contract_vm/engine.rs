@@ -118,6 +118,10 @@ impl<'a> ContractInstance {
                 Some(d) => d
             };
             ContractInstance::dump_result("init msg.data:", data.0.as_slice());
+
+            for log in msg.log {
+                print!("{} => {}",log.key,log.value)
+            }
         } else if func_type == "handle" {
             let env = mock_env_addr(&self.instance.api, &HumanAddr(sender), &HumanAddr(contract_addr.clone()), &[]);
             let handle_result = cosmwasm_vm::call_handle::<_, _, _, cosmwasm_std::Never>(&mut self.instance, &env, param.as_bytes()).expect("VM error");

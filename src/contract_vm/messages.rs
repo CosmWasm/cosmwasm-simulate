@@ -35,7 +35,10 @@ impl Message {
         println!("load messages from: {}", path);
         let mut msgs = Vec::new();
         let data = match load_data_from_file(path.as_str()) {
-            Err(_e) => return msgs,
+            Err(e) => {
+                println!("can not load target message file: {} => {}",path.as_str(),e.as_str());
+                return msgs
+            },
             Ok(code) => code,
         };
 
