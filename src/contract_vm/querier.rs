@@ -1,12 +1,20 @@
-use cosmwasm_std::{HumanAddr, Coin, Querier as stdQuerier, WasmQuery, to_binary, QueryRequest,
-                   Never, QuerierResult as stdQuerierResult, SystemError, from_slice, Binary};
-use cosmwasm_vm::{Querier, QuerierResult};
+use cosmwasm_std::{HumanAddr, Coin, Querier as stdQuerier, WasmQuery, to_binary, QueryRequest, QuerierResult as stdQuerierResult, SystemError, from_slice, Empty};
 use serde::Serialize;
 use cosmwasm_std::testing::{BankQuerier, StakingQuerier};
+use cosmwasm_vm::{GasInfo, Querier};
+use serde::de::DeserializeOwned;
+use std::marker::PhantomData;
 
 pub type CallBackFunc = fn(&WasmQuery) -> stdQuerierResult;
 
-#[derive(Clone, Default)]
+const GAS_COST_QUERY_FLAT: u64 = 100_000;
+/// Gas per request byte
+const GAS_COST_QUERY_REQUEST_MULTIPLIER: u64 = 0;
+/// Gas per reponse byte
+const GAS_COST_QUERY_RESPONSE_MULTIPLIER: u64 = 100;
+
+
+#[derive(Clone)]
 pub struct MyMockQuerier {
     querier: StdMockQuerier,
 }
@@ -39,24 +47,39 @@ impl MyMockQuerier {
 }
 
 
-impl Querier for MyMockQuerier {
-    fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
+impl cosmwasm_vm::Querier for MyMockQuerier {
+    fn raw_query(&self, bin_request: &[u8]) -> cosmwasm_vm::QuerierResult {
         let res = self.querier.raw_query(bin_request);
         // We don't use FFI, so FfiResult is always Ok() regardless of error on other levels
-        Ok(res)
+        let gas_info = GasInfo::with_externally_used(
+            GAS_COST_QUERY_FLAT
+                + (GAS_COST_QUERY_REQUEST_MULTIPLIER * (2))
+                + (GAS_COST_QUERY_RESPONSE_MULTIPLIER),
+        );
+
+        return (Ok(res),gas_info);
     }
 }
 
 impl MyMockQuerier {
-    pub fn handle_query<T: Serialize>(&self, request: &QueryRequest<T>) -> QuerierResult {
+    pub fn handle_query<T: Serialize>(&self, request: &QueryRequest<T>) -> cosmwasm_vm::QuerierResult {
         // encode the request, then call raw_query
+
+        let gas_info = GasInfo::with_externally_used(
+            GAS_COST_QUERY_FLAT
+                + (GAS_COST_QUERY_REQUEST_MULTIPLIER * (2))
+                + (GAS_COST_QUERY_RESPONSE_MULTIPLIER),
+        );
+
         let bin = match to_binary(request) {
             Ok(raw) => raw,
             Err(e) => {
-                return Ok(Err(SystemError::InvalidRequest {
-                    error: format!("Serializing query request: {}", e),
-                    request: Binary(b"N/A".to_vec()),
-                }));
+
+                let res = Err(SystemError::InvalidRequest {
+                    error: format!("Parsing query request: {}", e),
+                    request: b"N/A".into(),}
+                    );
+                return (Ok(res),gas_info);
             }
         };
         self.raw_query(bin.as_slice())
@@ -65,18 +88,20 @@ impl MyMockQuerier {
 
 
 #[derive(Clone, Default)]
-pub struct StdMockQuerier{
+pub struct StdMockQuerier<C: DeserializeOwned = Empty>{
     bank: BankQuerier,
     staking: StakingQuerier,
     wasm: CustomizationWasmQuerier,
+    marker :PhantomData<C>
 }
 
-impl StdMockQuerier {
+impl<C: DeserializeOwned> StdMockQuerier<C> {
     pub fn new(balances: &[(&HumanAddr, &[Coin])], call_back: CallBackFunc) -> Self {
         StdMockQuerier {
             bank: BankQuerier::new(balances),
             staking: StakingQuerier::default(),
             wasm: CustomizationWasmQuerier::new(call_back),
+            marker: PhantomData,
         }
     }
 
@@ -98,26 +123,8 @@ impl StdMockQuerier {
     ) {
         self.staking = StakingQuerier::new(denom, validators, delegations);
     }
-}
 
-impl stdQuerier for StdMockQuerier {
-    fn raw_query(&self, bin_request: &[u8]) -> stdQuerierResult {
-        // MockQuerier doesn't support Custom, so we ignore it completely here
-        let request: QueryRequest<Never> = match from_slice(bin_request) {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(SystemError::InvalidRequest {
-                    error: format!("Parsing query request: {}", e),
-                    request: bin_request.into(),
-                })
-            }
-        };
-        self.handle_query(&request)
-    }
-}
-
-impl StdMockQuerier {
-    pub fn handle_query<T>(&self, request: &QueryRequest<T>) -> stdQuerierResult {
+    pub fn handle_query<T>(&self, request: &QueryRequest<T>) -> cosmwasm_std::QuerierResult {
         match &request {
             QueryRequest::Bank(bank_query) => self.bank.query(bank_query),
             QueryRequest::Custom(_) => Err(SystemError::UnsupportedRequest {
@@ -126,6 +133,22 @@ impl StdMockQuerier {
             QueryRequest::Staking(staking_query) => self.staking.query(staking_query),
             QueryRequest::Wasm(msg) => self.wasm.query(msg),
         }
+    }
+}
+
+impl <C: DeserializeOwned> stdQuerier for StdMockQuerier<C>{
+    fn raw_query(&self, bin_request: &[u8]) -> cosmwasm_std::QuerierResult {
+        // MockQuerier doesn't support Custom, so we ignore it completely here
+        let request:QueryRequest<C> = match from_slice(&bin_request) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(SystemError::InvalidRequest {
+                    error: format!("Parsing query request: {}", e),
+                    request: bin_request.into(),
+                })
+            }
+        };
+        return self.handle_query(&request)
     }
 }
 

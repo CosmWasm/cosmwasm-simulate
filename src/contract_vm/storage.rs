@@ -1,6 +1,4 @@
-use cosmwasm_vm::{ReadonlyStorage, FfiResult, Storage};
-
-use kv::{Raw, Store, Config, Bucket};
+use cosmwasm_vm::{FfiResult, GasInfo};
 
 #[cfg(feature = "iterator")]
 use kv::{Item, Error};
@@ -9,16 +7,17 @@ use kv::{Item, Error};
 use cosmwasm_std::{Order};
 
 use crate::contract_vm::watcher;
+use std::collections::BTreeMap;
 
 /// KV is a Key-Value pair, returned from our iterators
 pub type KV = (Vec<u8>, Vec<u8>);
 
-pub struct MyMockStorage<'a> {
-    bucket: Bucket<'a,Raw,Raw>
+pub struct MyMockStorage {
+    bucket: BTreeMap<Vec<u8>, Vec<u8>>,
 }
 
-impl<'a> MyMockStorage<'a> {
-    pub fn new(bucket: Bucket<'a, Raw,Raw>) -> Self {
+impl MyMockStorage {
+    pub fn new(bucket: BTreeMap<Vec<u8>, Vec<u8>>) -> Self {
         MyMockStorage{bucket }
     }
 }
@@ -33,24 +32,18 @@ fn clone_item(item: Result<Item<Raw, Raw>, Error>) -> KV {
     (key, value)
 }
 
-impl<'a> Default for MyMockStorage<'a>{
+impl<'a> Default for MyMockStorage{
     fn default() -> Self {
-        let cfg = Config::new("./tmp").temporary(true);
-        let data = Store::new(cfg).unwrap();
-        let bucket = data.bucket::<Raw, Raw>(None).unwrap();
-
+        let bucket = BTreeMap::new();
         MyMockStorage{bucket}
     }
 }
 
-impl<'a> ReadonlyStorage for MyMockStorage<'static> {
-    fn get(&self, key: &[u8]) -> FfiResult<Option<Vec<u8>>> {
-        let result = self.bucket.get(key).unwrap();
+impl<'a> cosmwasm_vm::Storage for MyMockStorage {
 
-        match result {
-            Some(value) => Ok(Some(value.to_vec())),
-            None => Ok(None)
-        }
+    fn get(&self, key: &[u8]) -> FfiResult<Option<Vec<u8>>> {
+        let gas_info = GasInfo{cost:100,externally_used:200};
+        return (Ok(self.bucket.get(key).cloned()),gas_info);
     }
 
     #[cfg(feature = "iterator")]
@@ -61,50 +54,38 @@ impl<'a> ReadonlyStorage for MyMockStorage<'static> {
         start: Option<&[u8]>,
         end: Option<&[u8]>,
         order: Order,
-    ) -> FfiResult<Box<dyn Iterator<Item = FfiResult<KV>> + 'a>> {
+    ) -> FfiResult<Box<dyn Iterator<Item = KV> + 'a>> {
+        let bounds = range_bounds(start, end);
 
-        let mut max_key: Vec<u8>;
-        let last_item = self.bucket.iter().last();
-        if !last_item.is_none() {
-            max_key = last_item.unwrap().unwrap().key::<Raw>().unwrap().to_vec();
-            max_key.push(1);
-        } else {
-            max_key = Vec::new();
+        // BTreeMap.range panics if range is start > end.
+        // However, this cases represent just empty range and we treat it as such.
+        match (bounds.start_bound(), bounds.end_bound()) {
+            (Bound::Included(start), Bound::Excluded(end)) if start > end => {
+                return (Ok(Box::new(iter::empty())),GasInfo{cost:100,externally_used:200});
+            }
+            _ => {}
         }
 
-        let starter = match start {
-            Some(val) => Raw::from(val),
-            None => Raw::default()
-        };
-
-        let ender = match end {
-            Some(val) => Raw::from(val),
-            None => Raw::from(max_key)
-        };
-
-        let itr = self.bucket.iter_range(starter,ender);
-
-        Ok(match order {
-            Order::Ascending => Box::new(itr.map(clone_item).map(FfiResult::Ok)),
-            Order::Descending => Box::new(itr.rev().map(clone_item).map(FfiResult::Ok)),
-        })
+        let iter = self.data.range(bounds);
+        match order {
+            Order::Ascending => (OkBox::new(iter.map(clone_item)),GasInfo{cost:100,externally_used:200}),
+            Order::Descending => (OkBox::new(iter.rev().map(clone_item)),GasInfo{cost:100,externally_used:200}),
+        }
     }
-}
 
-impl<'a> Storage for MyMockStorage<'static> {
-    fn set(&mut self, key: &[u8], value: &[u8]) -> FfiResult<()> {
-        let _ = self.bucket.set(key.to_vec(), value.to_vec());
+    fn set(&mut self, key: &[u8], value: &[u8]) -> FfiResult<()>{
+        let _ = self.bucket.insert(key.to_vec(), value.to_vec());
         // self.bucket.flush();
         watcher::logger_storage_event_insert(key,value);
+        return (Ok(()),GasInfo{cost:100,externally_used:200});
 
-        Ok(())
     }
 
     fn remove(&mut self, key: &[u8]) -> FfiResult<()> {
         let _ = self.bucket.remove(key);
         // self.bucket.flush();
-
-        Ok(())
+        watcher::logger_storage_event_remove(key);
+        return (Ok(()),GasInfo{cost:100,externally_used:200});
     }
 }
 
@@ -269,10 +250,7 @@ mod test {
 
     #[test]
     fn get_and_set() {
-        let cfg = Config::new("./test").temporary(true);
-        let data  = Store::new(cfg).unwrap();
-        let bucket = data.bucket::<Raw, Raw>(Some("test1")).unwrap();
-        let mut store = MyMockStorage::new(bucket);
+        let mut store = MyMockStorage::default();
 
         assert_eq!(None, store.get(b"foo").unwrap());
         store.set(b"foo", b"bar").unwrap();
@@ -288,11 +266,7 @@ mod test {
 
     #[test]
     fn delete() {
-        let cfg = Config::new("./test").temporary(true);
-        let data  = Store::new(cfg).unwrap();
-        let bucket = data.bucket::<Raw, Raw>(None).unwrap();
-
-        let mut store = MyMockStorage::new(bucket);
+        let mut store = MyMockStorage::default();
 
         store.set(b"foo", b"bar").unwrap();
         store.set(b"food", b"bank").unwrap();
@@ -305,11 +279,7 @@ mod test {
     #[test]
     #[cfg(feature = "iterator")]
     fn iterator() {
-        let cfg = Config::new("./test").read_only(false).temporary(true);
-        let data  = Store::new(cfg).unwrap();
-        let bucket = data.bucket::<Raw, Raw>(Some("test".as_ref())).unwrap();
-
-        let mut store = MyMockStorage::new(bucket);
+        let mut store = MyMockStorage::default();
 
         store.set(b"foo", b"bar").expect("error setting value");
         iterator_test_suite(&mut store);

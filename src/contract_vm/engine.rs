@@ -12,18 +12,19 @@ use wasmer_middleware_common::metering;
 
 use wasmer_singlepass_backend::ModuleCodeGenerator as SinglePassMCG;
 use self::cosmwasm_vm::{Instance};
-use self::cosmwasm_std::{Binary, HumanAddr};
+use self::cosmwasm_std::{Binary, HumanAddr, Empty};
 use crate::contract_vm::mock::{install, mock_env_addr, handler_resp};
 use crate::contract_vm::querier::MyMockQuerier;
 use crate::contract_vm::storage::MyMockStorage;
 use crate::contract_vm::analyzer;
 use self::cosmwasm_vm::testing::MockApi;
 
+
 static COMPILE_GAS_LIMIT: u64 = 10_000_000_000;
 
 pub struct ContractInstance {
     pub module: Module,
-    pub instance: Instance<MyMockStorage<'static>, MockApi, MyMockQuerier>,
+    pub instance: Instance<MyMockStorage, MockApi, MyMockQuerier>,
     pub wasm_file: String,
     pub analyzer: analyzer::Analyzer,
 }
@@ -54,7 +55,7 @@ impl<'a> ContractInstance {
         return Ok(ContractInstance::make_instance(md, inst, wasm_file.to_string()));
     }
 
-    fn make_instance(md: Module, inst: cosmwasm_vm::Instance<MyMockStorage<'a>, MockApi, MyMockQuerier>, file: String) -> ContractInstance {
+    fn make_instance(md: Module, inst: cosmwasm_vm::Instance<MyMockStorage, MockApi, MyMockQuerier>, file: String) -> ContractInstance {
         return ContractInstance {
             module: md,
             instance: inst,
@@ -95,11 +96,11 @@ impl<'a> ContractInstance {
         println!("***************************[{}] call started***************************", func_type);
         println!("sender<{}>, contract addr<{}>, message<{}>", sender, contract_addr, param);
 
-        let gas_init = self.instance.get_gas();
+        let gas_init = self.instance.get_gas_left();
         if func_type == "init" {
             let env = mock_env_addr(&self.instance.api, &HumanAddr(sender), &HumanAddr(contract_addr), &[]);
             let init_result =
-                cosmwasm_vm::call_init::<_, _, _, cosmwasm_std::Never>(&mut self.instance, &env, param.as_bytes());
+                cosmwasm_vm::call_init::<_, _, _, Empty>(&mut self.instance, &env, param.as_bytes());
             let msg = match init_result {
                 Ok(data) => match data {
                     Ok(resp) => resp,
@@ -113,18 +114,13 @@ impl<'a> ContractInstance {
                     return "ERROR      :execute init failed".to_string();
                 }
             };
-            let data: Binary = match msg.data {
-                None => Binary::from("".as_bytes()),
-                Some(d) => d
-            };
-            ContractInstance::dump_result("init msg.data:", data.0.as_slice());
 
             for log in msg.log {
                 print!("{} => {}",log.key,log.value)
             }
         } else if func_type == "handle" {
             let env = mock_env_addr(&self.instance.api, &HumanAddr(sender), &HumanAddr(contract_addr.clone()), &[]);
-            let handle_result = cosmwasm_vm::call_handle::<_, _, _, cosmwasm_std::Never>(&mut self.instance, &env, param.as_bytes()).expect("VM error");
+            let handle_result = cosmwasm_vm::call_handle::<_, _, _, Empty>(&mut self.instance, &env, param.as_bytes()).expect("VM error");
             let res = match handle_result {
                 Ok(data) => handler_resp(data, HumanAddr(contract_addr)),
                 Err(err) => {
@@ -166,7 +162,7 @@ impl<'a> ContractInstance {
         } else {
             println!("wrong dispatcher call {}", func_type);
         }
-        let gas_used = gas_init - self.instance.get_gas();
+        let gas_used = gas_init - self.instance.get_gas_left();
         println!("Gas used   : {}", gas_used);
         println!("***************************[{}] call finished***************************", func_type);
         return "Execute Success".to_string();

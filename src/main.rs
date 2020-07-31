@@ -27,6 +27,7 @@ fn main() {
 
         for m in msgs {
             if let Some(contract) = contract_map.get_mut(&m.contract_addr) {
+                contract.show_module_info();
                 contract.call(
                     m.sender.clone(),
                     m.contract_addr.clone(),

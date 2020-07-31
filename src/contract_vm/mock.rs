@@ -2,8 +2,8 @@ use cosmwasm_vm::{Api, Instance, Extern, call_query, call_handle};
 use cosmwasm_vm::testing::{mock_env, MockApi, MockInstanceOptions};
 use cosmwasm_std::{HandleResponse, WasmQuery,
                    QuerierResult, SystemError, CosmosMsg, WasmMsg, StdResult, HumanAddr, Coin, Env,};
-use kv::{Config, Store, Raw};
-use std::collections::HashMap;
+use kv::{Config, Store};
+use std::collections::{HashMap, BTreeMap};
 use std::sync::Mutex;
 // use rand::{thread_rng, Rng};
 // use rand::distributions::Alphanumeric;
@@ -25,9 +25,8 @@ lazy_static! {
     };
 }
 
-pub fn mock_env_addr<A: Api>(api: &A, sender: &HumanAddr, contract_address: &HumanAddr, sent: &[Coin]) -> Env {
-    let mut env = mock_env(api, sender, sent);
-    env.contract.address = api.canonical_address(contract_address).unwrap();
+pub fn mock_env_addr<A: Api>(_: &A, sender: &HumanAddr, _: &HumanAddr, sent: &[Coin]) -> Env {
+    let env = mock_env(sender, sent);
     env
 }
 
@@ -35,9 +34,9 @@ pub fn mock_instance<'a>(
     wasm: &[u8],
     contract_balance: &[Coin],
     contract_address: HumanAddr,
-    contract_storage: MyMockStorage<'a>,
+    contract_storage: MyMockStorage,
     call_back: CallBackFunc,
-) -> Instance<MyMockStorage<'a>, MockApi, MyMockQuerier> {
+) -> Instance<MyMockStorage, MockApi, MyMockQuerier> {
     // check_wasm(wasm, &options.supported_features).unwrap();
 
     let options = MockInstanceOptions {
@@ -63,8 +62,8 @@ pub fn mock_instance<'a>(
     Instance::from_code(wasm, deps, options.gas_limit).unwrap()
 }
 
-pub fn install<'a>(contract_address: HumanAddr, contract_name: String, contract_code: Vec<u8>) -> Instance<MyMockStorage<'a>, MockApi, MyMockQuerier> {
-    let contract_bucket = TEST_STORE.bucket::<Raw, Raw>(Some(contract_name.clone().as_str())).unwrap();
+pub fn install<'a>(contract_address: HumanAddr, contract_name: String, contract_code: Vec<u8>) -> Instance<MyMockStorage, MockApi, MyMockQuerier> {
+    let contract_bucket = BTreeMap::new();
     let contract_store = MyMockStorage::new(contract_bucket);
     let contract_deps = mock_instance(contract_code.clone().as_slice(), &[],
                                           contract_address.clone(), contract_store, query_call_back);
@@ -80,11 +79,11 @@ pub fn install<'a>(contract_address: HumanAddr, contract_name: String, contract_
     contract_deps
 }
 
-pub fn instantiate<'a>(contract_addr: HumanAddr) -> Instance<MyMockStorage<'a>, MockApi, MyMockQuerier> {
+pub fn instantiate<'a>(contract_addr: HumanAddr) -> Instance<MyMockStorage, MockApi, MyMockQuerier> {
     let contract_map = CONTRACT_INFO.lock().unwrap();
     let contract_info = contract_map.get(&contract_addr.clone()).unwrap();
 
-    let contract_bucket = TEST_STORE.bucket::<Raw, Raw>(Some(contract_info.name.as_str())).unwrap();
+    let contract_bucket = BTreeMap::new();
     let contract_store = MyMockStorage::new(contract_bucket);
     let contract_deps = mock_instance(contract_info.code.as_slice(), &[],
                                           contract_addr, contract_store, query_call_back);
