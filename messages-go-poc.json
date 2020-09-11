@@ -1,25 +1,17 @@
 {
   "messages": [
     {
-        "wasm_file": "wasm_go_poc/contract.wasm",
+        "wasm_file": "/Users/oker/work/go/src/github.com/cosmwasm/cosmwasm-go/example/erc20/contract.wasm",
         "type": "init", "contract_addr": "go_poc_addr", "sender": "original_owner_addr",
-        "message": {"UserName":"someone","Password":"foobar","Money":15}
+        "message": {"name":"OKB","symbol":"OKB","decimal":10,"total_supply":170000}
+    },
+    {
+      "type": "handle", "contract_addr": "go_poc_addr","sender": "original_owner_addr",
+      "message": {"Transfer":{"to":"1234567","value": 2000}}
     },
     {
       "type": "query", "contract_addr": "go_poc_addr",
-      "message": {"QueryType":"user"}
-    },
-    {
-      "type": "query", "contract_addr": "go_poc_addr",
-      "message": {"QueryType":"balance"}
-    },
-    {
-      "type": "handle", "contract_addr": "go_poc_addr", "sender": "original_owner_addr",
-      "message": {"Operation":"burn","Password":"foobar"}
-    },
-    {
-      "type": "query", "contract_addr": "go_poc_addr",
-      "message": {"QueryType":"balance"}
+      "message": {"balance":{"address":"1234567"}}
     }
   ]
 }

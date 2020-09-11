@@ -59,7 +59,8 @@ pub fn mock_instance<'a>(
         querier: MyMockQuerier::new(&balances, call_back),
         storage: contract_storage,
     };
-    Instance::from_code(wasm, deps, options.gas_limit).unwrap()
+    let ret = Instance::from_code(wasm, deps, 50000000);
+    return ret.unwrap();
 }
 
 pub fn install<'a>(contract_address: HumanAddr, contract_name: String, contract_code: Vec<u8>) -> Instance<MyMockStorage, MockApi, MyMockQuerier> {
